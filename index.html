@@ -44,6 +44,7 @@ select{border:1.5px solid var(--line);border-radius:10px;padding:9px;font-size:1
 #map{height:330px;border-radius:14px;margin-top:14px;border:1px solid var(--line);display:none;z-index:0}
 .maptip{font-size:11.5px;color:var(--muted);margin-top:6px;text-align:center;display:none}
 #results{margin-top:6px}
+.resnote{margin-top:14px;background:var(--bus-yellow-soft);border:1px solid var(--bus-yellow);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.7;color:var(--navy)}
 .stop{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px;box-shadow:0 2px 6px rgba(27,42,74,.05)}
 .stop.best{border:2px solid var(--bus-yellow);box-shadow:0 4px 14px rgba(245,179,1,.25)}
 .stoptop{display:flex;align-items:flex-start;gap:10px}
@@ -117,7 +118,7 @@ footer{text-align:center;font-size:11.5px;color:var(--muted);margin-top:26px;lin
       <select id="routeFilter"><option value="">全部路線</option></select>
     </div>
     <div id="status"></div>
-    <p class="hint">距離為<b>實際步行路線</b>計算;若暫時無法連上路線引擎,卡片不顯示數字,請點各站「Google 步行導航」查看。定位後也可以<b>直接點地圖</b>換出發位置。</p>
+    <p class="hint">實際距離與時間請點各站「<b>Google 步行導航</b>」查看。定位後也可以<b>直接點地圖</b>換出發位置。</p>
   </div>
 
   <div id="map"></div>
@@ -613,7 +614,7 @@ function drawMap(top){
     const bounds=[[userPos.lat,userPos.lng]];
     top.forEach((s,i)=>{
       const m=L.marker([s.lat,s.lng],{icon:pin(i===0?"#f5b301":"#1b2a4a",(i+1)+". "+s.stop,i!==0)})
-        .addTo(map).bindPopup("<b>路線 "+esc(s.route)+"｜"+esc(s.stop)+"</b><br>"+esc(s.desc)+"<br>早 "+esc(s.am)+"／放學 "+esc(s.pm)+(s.walk?"<br>步行約 "+fmtDist(s.walk.dist):""));
+        .addTo(map).bindPopup("<b>路線 "+esc(s.route)+"｜"+esc(s.stop)+"</b><br>"+esc(s.desc)+"<br>早 "+esc(s.am)+"／放學 "+esc(s.pm)+"");
       stopMarkers.push(m);
       if(i<4)bounds.push([s.lat,s.lng]);
     });
@@ -656,22 +657,20 @@ function rank(){
     .sort((a,b)=>a.dist-b.dist);
 }
 function render(list){
-  const box=$("results");box.innerHTML="";
+  const box=$("results");box.innerHTML=
+    "<div class='resnote'>📍 以下是您附近的站點。請您依照地圖實際位置做判斷;如果不確定,請跟<b>學校承辦人員</b>做確認。</div>";
   const top=list.slice(0,8);
   top.forEach((s,i)=>{
     const nav=navUrl(s);
     const gmap=stopMapUrl(s.code,s.addr,s.lat,s.lng,s.refined);
     const d=document.createElement("div");
     d.className="stop"+(i===0?" best":"");
-    const approxTag=userPos.ai?"約 ":"";
     d.innerHTML=
       "<div class='stoptop'>"+
         "<div class='routechip'>"+esc(s.route)+"<small>路線</small></div>"+
         "<div><div class='stopname'>"+esc(s.stop)+(i===0?"<span class='bestflag'>最近</span>":"")+"</div>"+
         "<div class='stopdesc'><a href='"+nav+"' target='_blank' rel='noopener'>"+esc(s.desc)+"</a></div></div>"+
-        "<div class='dist'>"+(s.walk?
-          "<b>"+approxTag+fmtDist(s.walk.dist)+"</b><span>步行約 "+Math.max(1,Math.round(s.walk.dur/60))+" 分鐘</span><span class='approx' style='color:#2e7d5b'>實際步行路線</span>"
-          :"<b>—</b><span>點導航查距離</span>")+"</div>"+
+
       "</div>"+
       "<div class='times2'><div class='t am'>🌅 早上發車<b>"+esc(s.am)+"</b></div><div class='t pm'>🌇 放學到站<b>"+esc(s.pm)+"</b></div></div>"+
       "<div class='acts'><a class='a-nav' href='"+nav+"' target='_blank' rel='noopener'>🚶 Google 步行導航</a>"+
@@ -778,9 +777,7 @@ async function runSearch(needGeocode){
       walked=await addWalking(list);
       if(walked)render(list);
     }catch(e){}
-    setStatus("✅ 查詢完成!"+(walked?
-      "最近站點:<b>路線 "+esc(list[0].route)+"｜"+esc(list[0].stop)+"</b>,實際步行距離約 <b>"+fmtDist(list[0].walk.dist)+"</b>。":
-      "已列出候選站點(暫時連不上路線引擎,卡片不顯示距離),請點各站綠色按鈕由 Google 導航查看實際距離。")+(userPos.ai?"⚠️ 你的位置為 <b>AI 估算,排序與距離僅供參考、可能有誤</b>,請務必點綠色按鈕用 Google 確認實際距離,":"")+"實際步行距離請以 Google 導航為準。","info");
+    setStatus("✅ 查詢完成!已列出您附近的站點。"+(userPos.ai?"⚠️ 此次定位為估算,順序僅供參考。":"")+"實際距離與時間請點各站「Google 步行導航」查看;如不確定,請與學校承辦人員確認。","info");
   }catch(e){
     const q=$("addr").value.trim();
     const est=q?offlineEstimate(q):null;
