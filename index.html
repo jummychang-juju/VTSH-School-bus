@@ -117,7 +117,7 @@ footer{text-align:center;font-size:11.5px;color:var(--muted);margin-top:26px;lin
       <select id="routeFilter"><option value="">全部路線</option></select>
     </div>
     <div id="status"></div>
-    <p class="hint">清單距離為<b>直線距離</b>,實際步行請點各站「Google 步行導航」。定位後也可以<b>直接點地圖</b>換出發位置。</p>
+    <p class="hint">距離為<b>實際步行路線</b>計算;若暫時無法連上路線引擎,卡片不顯示數字,請點各站「Google 步行導航」查看。定位後也可以<b>直接點地圖</b>換出發位置。</p>
   </div>
 
   <div id="map"></div>
@@ -494,16 +494,42 @@ async function nominatim(q){
   const lat=+j[0].lat,lng=+j[0].lon;
   return validTW(lat,lng)?{lat,lng}:null;
 }
+let ANCHORS=null;
+function anchorTable(){
+  if(!ANCHORS)ANCHORS=STOPS.map(s=>s[4]+"="+s[7].toFixed(4)+","+s[8].toFixed(4)).join("\n");
+  return ANCHORS;
+}
+async function claudeGeocode(q){
+  try{
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,
+      messages:[{role:"user",content:"以下是台中地區已知地點與座標的參考框架:\n"+anchorTable()+"\n\n請對照上述參考點的相對位置,估計地址「"+q+"」的座標(重點:與參考框架一致,例如同一條路上依門牌號內插、鄰近路口對齊)。只回傳一個JSON物件,格式:{\"lat\":24.1234,\"lng\":120.1234},不要輸出任何其他文字。"}]})});
+  if(!res.ok)throw new Error("AI "+res.status);
+  const data=await res.json();
+  const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text||"").join("\n").replace(/```json|```/g,"");
+  const m=txt.match(/\{[\s\S]*?\}/);
+  if(!m)throw new Error("AI 回覆無法解析");
+  const j=JSON.parse(m[0]);
+  const lat=+j.lat,lng=+j.lng;
+  if(!validTW(lat,lng))throw new Error("bad");
+  return {lat,lng,ai:true};
+  }catch(e){throw new Error("線上定位暫時無法使用");}
+}
 async function geocodeUser(q){
-  let g=await nominatim(q);
-  if(!g&&!/[台臺]中|彰化|南投/.test(q))g=await nominatim("台中市"+q);
-  if(!g){
-    // 退一步:去掉巷弄號,用路名+段定位
-    const road=q.match(/[\u4e00-\u9fa5]{2,8}(?:路|街|大道)(?:[一二三四五六七八九十0-9]+段)?/);
-    if(road)g=await nominatim((/[台臺]中|彰化|南投/.test(q)?"":"台中市")+ (q.match(/[\u4e00-\u9fa5]{1,3}區/)||[""])[0] + road[0]);
-  }
-  if(!g)throw new Error("找不到這個地址");
-  return g;
+  let g=null;
+  try{
+    g=await nominatim(q);
+    if(!g&&!/[台臺]中|彰化|南投/.test(q))g=await nominatim("台中市"+q);
+    if(!g){
+      // 退一步:去掉巷弄號,用路名+段定位
+      const road=q.match(/[\u4e00-\u9fa5]{2,8}(?:路|街|大道)(?:[一二三四五六七八九十0-9]+段)?/);
+      if(road)g=await nominatim((/[台臺]中|彰化|南投/.test(q)?"":"台中市")+ (q.match(/[\u4e00-\u9fa5]{1,3}區/)||[""])[0] + road[0]);
+    }
+  }catch(e){g=null;}
+  if(g)return g;
+  // 定位服務失敗或查不到 → 改用 AI 估算(此路也失敗才丟錯進關鍵字備援)
+  return await claudeGeocode(q);
 }
 async function refineStops(cands){
   for(const s of cands){
@@ -523,6 +549,35 @@ async function refineStops(cands){
   }
 }
 
+/* ===== 實際步行路線(OSRM foot 免費引擎) ===== */
+async function walkRoute(a,b){
+  try{
+    const url="https://routing.openstreetmap.de/routed-foot/route/v1/foot/"+
+      a.lng.toFixed(6)+","+a.lat.toFixed(6)+";"+b.lng.toFixed(6)+","+b.lat.toFixed(6)+"?overview=false";
+    const res=await Promise.race([
+      fetch(url,{headers:{"Accept":"application/json"}}),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),4000))
+    ]);
+    if(!res.ok)return null;
+    const j=await res.json();
+    const r=j.routes&&j.routes[0];
+    if(!r||!(r.distance>0))return null;
+    return {dist:r.distance,dur:r.duration};
+  }catch(e){return null;}
+}
+async function addWalking(list){
+  const top=list.slice(0,8);
+  await Promise.all(top.map(async s=>{
+    const w=await walkRoute(userPos,{lat:s.lat,lng:s.lng});
+    if(w)s.walk=w;
+  }));
+  if(top.some(s=>s.walk)){
+    // 有實際路線者用實際距離,無者以直線×1.3 近似,整體重排
+    list.sort((a,b)=>(a.walk?a.walk.dist:a.dist*1.3)-(b.walk?b.walk.dist:b.dist*1.3));
+    return true;
+  }
+  return false;
+}
 /* ===== 地圖 ===== */
 function mapAvailable(){return typeof L!=="undefined";}
 function initMap(){
@@ -557,7 +612,7 @@ function drawMap(top){
     const bounds=[[userPos.lat,userPos.lng]];
     top.forEach((s,i)=>{
       const m=L.marker([s.lat,s.lng],{icon:pin(i===0?"#f5b301":"#1b2a4a",(i+1)+". "+s.stop,i!==0)})
-        .addTo(map).bindPopup("<b>路線 "+esc(s.route)+"｜"+esc(s.stop)+"</b><br>"+esc(s.desc)+"<br>早 "+esc(s.am)+"／放學 "+esc(s.pm)+"<br>約 "+fmtDist(s.dist));
+        .addTo(map).bindPopup("<b>路線 "+esc(s.route)+"｜"+esc(s.stop)+"</b><br>"+esc(s.desc)+"<br>早 "+esc(s.am)+"／放學 "+esc(s.pm)+(s.walk?"<br>步行約 "+fmtDist(s.walk.dist):""));
       stopMarkers.push(m);
       if(i<4)bounds.push([s.lat,s.lng]);
     });
@@ -581,10 +636,8 @@ function navUrl(s){
 function anyMapUrl(code,addr,lat,lng){
   const g=cacheGet(code);
   const dst=g?g.lat.toFixed(5)+","+g.lng.toFixed(5):encodeURIComponent(addr);
-  if(userPos){
-    const org=userAddrText?encodeURIComponent(userAddrText):userPos.lat.toFixed(6)+","+userPos.lng.toFixed(6);
-    return "https://www.google.com/maps/dir/?api=1&origin="+org+"&destination="+dst+"&travelmode=walking";
-  }
+  const org=userAddrText?encodeURIComponent(userAddrText):(userPos?userPos.lat.toFixed(6)+","+userPos.lng.toFixed(6):null);
+  if(org)return "https://www.google.com/maps/dir/?api=1&origin="+org+"&destination="+dst+"&travelmode=walking";
   return "https://www.google.com/maps?q="+dst;
 }
 /* ===== 主流程 ===== */
@@ -609,13 +662,15 @@ function render(list){
     const gmap=stopMapUrl(s.code,s.addr,s.lat,s.lng,s.refined);
     const d=document.createElement("div");
     d.className="stop"+(i===0?" best":"");
+    const approxTag=userPos.ai?"約 ":"";
     d.innerHTML=
       "<div class='stoptop'>"+
         "<div class='routechip'>"+esc(s.route)+"<small>路線</small></div>"+
         "<div><div class='stopname'>"+esc(s.stop)+(i===0?"<span class='bestflag'>最近</span>":"")+"</div>"+
         "<div class='stopdesc'><a href='"+nav+"' target='_blank' rel='noopener'>"+esc(s.desc)+"</a></div></div>"+
-        "<div class='dist'><b>"+fmtDist(s.dist)+"</b><span>約步行 "+walkTime(s.dist)+"</span>"+
-        (s.refined?"":"<span class='approx'>直線估算</span>")+"</div>"+
+        "<div class='dist'>"+(s.walk?
+          "<b>"+approxTag+fmtDist(s.walk.dist)+"</b><span>步行約 "+Math.max(1,Math.round(s.walk.dur/60))+" 分鐘</span><span class='approx' style='color:#2e7d5b'>實際步行路線</span>"
+          :"<b>—</b><span>點導航查距離</span>")+"</div>"+
       "</div>"+
       "<div class='times2'><div class='t am'>🌅 早上發車<b>"+esc(s.am)+"</b></div><div class='t pm'>🌇 放學到站<b>"+esc(s.pm)+"</b></div></div>"+
       "<div class='acts'><a class='a-nav' href='"+nav+"' target='_blank' rel='noopener'>🚶 Google 步行導航</a>"+
@@ -623,6 +678,47 @@ function render(list){
     box.appendChild(d);
   });
   drawMap(top);
+}
+/* ===== 純離線推算:同路門牌內插 / 路口錨點 ===== */
+function parseRoadNum(a){
+  a=a.replace(/台中市|臺中市|彰化縣|彰化市|員林市|南投縣|南投市|[\u4e00-\u9fa5]{1,3}(?:區|鄉|鎮)/g,"");
+  const cn="一二三四五六七八九";
+  const m=a.match(/([\u4e00-\u9fa5]{1,6}(?:路|街|大道))(?:([一二三四五六七八九0-9])段)?(?:[^0-9]*?(\d+))?/);
+  if(!m)return null;
+  let sec=m[2]||"";
+  if(/[0-9]/.test(sec))sec=cn[+sec-1]||sec;
+  return {road:m[1],sec,num:m[3]?+m[3]:null};
+}
+function offlineEstimate(q){
+  const p=parseRoadNum(q.replace(/台中市|臺中市|彰化縣|彰化市|員林市|南投縣|南投市|[\u4e00-\u9fa5]{1,3}(?:區|鄉|鎮)/g,""));
+  if(!p)return null;
+  // A. 同路門牌錨點(地址含同路名+號)
+  let anchors=STOPS.map(s=>({s,pp:parseRoadNum(s[4])}))
+    .filter(x=>x.pp&&x.pp.road===p.road&&x.pp.num!==null);
+  if(p.sec){
+    const same=anchors.filter(x=>x.pp.sec===p.sec);
+    if(same.length)anchors=same;
+  }
+  if(anchors.length>=2&&p.num!==null){
+    anchors.sort((a,b)=>Math.abs(a.pp.num-p.num)-Math.abs(b.pp.num-p.num));
+    const a1=anchors[0],a2=anchors.find(x=>x.pp.num!==a1.pp.num);
+    if(a2){
+      const r=(p.num-a1.pp.num)/(a2.pp.num-a1.pp.num);
+      const rc=Math.max(-1.5,Math.min(2.5,r));
+      return {lat:a1.s[7]+(a2.s[7]-a1.s[7])*rc,lng:a1.s[8]+(a2.s[8]-a1.s[8])*rc,
+              grade:"同路門牌推算"};
+    }
+  }
+  if(anchors.length>=1)
+    return {lat:anchors[0].s[7],lng:anchors[0].s[8],grade:"同路站點近似"};
+  // B. 路口錨點:站名或說明含「你的路名+口」(如 昌平路口)
+  const xings=STOPS.filter(s=>s[2].includes(p.road+"口")||s[3].includes(p.road+"口"));
+  if(xings.length){
+    const lat=xings.reduce((t,s)=>t+s[7],0)/xings.length;
+    const lng=xings.reduce((t,s)=>t+s[8],0)/xings.length;
+    return {lat,lng,grade:"路口位置概估"};
+  }
+  return null;
 }
 /* 定位失敗 → 路名關鍵字備援 */
 function keywordFallback(q){
@@ -646,7 +742,7 @@ function keywordFallback(q){
     d.innerHTML="<div class='stoptop'><div class='routechip'>"+esc(s[1])+"<small>路線</small></div>"+
       "<div><div class='stopname'>"+esc(s[2])+"</div><div class='stopdesc'><a href='"+gmap+"' target='_blank' rel='noopener'>"+esc(s[3])+"</a></div></div></div>"+
       "<div class='times2'><div class='t am'>🌅 早上發車<b>"+esc(s[5])+"</b></div><div class='t pm'>🌇 放學到站<b>"+esc(s[6])+"</b></div></div>"+
-      "<div class='acts'><a class='a-map' href='"+gmap+"' target='_blank' rel='noopener'>站點地圖</a></div>";
+      "<div class='acts'><a class='a-nav' href='"+gmap+"' target='_blank' rel='noopener'>🚶 從輸入地址導航</a></div>";
     box.appendChild(d);
   });
   return true;
@@ -658,24 +754,40 @@ async function runSearch(needGeocode){
     if(needGeocode){
       const q=$("addr").value.trim();
       if(!q){setStatus("請先輸入地址,或改用「使用我目前的位置」。","err");return;}
+      userAddrText=q; // 先記住輸入的地址,之後所有導航連結一律以此為起點
       setStatus("<span class='spin'></span>正在定位地址…","info");
-      userPos=await geocodeUser(q);
-      userLabel="住家";
-      userAddrText=q;
+      const gu=await geocodeUser(q);
+      userPos={lat:gu.lat,lng:gu.lng};
+      userPos.ai=!!gu.ai;
+      userLabel=gu.ai?"住家(估算)":"住家";
     }
     if(!userPos)return;
     let list=rank();
     render(list);
     setStatus("<span class='spin'></span>已列出初步結果,正在校正前幾名站點的精確位置…(數秒)","info");
+    let walked=false;
     try{
       await refineStops(list.slice(0,5));
       list=rank();
       render(list);
     }catch(e){/* 校正失敗就用估算值 */}
-    setStatus("✅ 查詢完成!最近站點:<b>路線 "+esc(list[0].route)+"｜"+esc(list[0].stop)+"</b>,距離約 <b>"+fmtDist(list[0].dist)+"</b>。實際步行距離請以 Google 導航為準。","info");
+    try{
+      walked=await addWalking(list);
+      if(walked)render(list);
+    }catch(e){}
+    setStatus("✅ 查詢完成!"+(walked?
+      "最近站點:<b>路線 "+esc(list[0].route)+"｜"+esc(list[0].stop)+"</b>,實際步行距離約 <b>"+fmtDist(list[0].walk.dist)+"</b>。":
+      "已列出候選站點(暫時連不上路線引擎,卡片不顯示距離),請點各站綠色按鈕由 Google 導航查看實際距離。")+(userPos.ai?"⚠️ 你的位置為 <b>AI 估算,排序與距離僅供參考、可能有誤</b>,請務必點綠色按鈕用 Google 確認實際距離,":"")+"實際步行距離請以 Google 導航為準。","info");
   }catch(e){
     const q=$("addr").value.trim();
-    if(q&&keywordFallback(q)){
+    const est=q?offlineEstimate(q):null;
+    if(est){
+      userPos={lat:est.lat,lng:est.lng,ai:true};
+      userLabel="住家(估算)";
+      const list=rank();
+      render(list);
+      setStatus("線上定位暫時無法使用,已改用<b>離線推算</b>("+esc(est.grade)+")排出候選站點。⚠️ 順序僅供估算參考、不顯示距離,實際距離請點各站綠色按鈕由 Google 導航查看(導航起點=你輸入的地址,不受估算影響)。","info");
+    }else if(q&&keywordFallback(q)){
       setStatus("線上定位暫時失敗("+esc(e.message)+"),已改用<b>路名關鍵字</b>比對出可能相近的站點(下方清單)。可稍後再試搜尋。","err");
     }else{
       setStatus("查詢時發生問題("+esc(e.message)+")。請確認地址含路名,或稍後再試。","err");
