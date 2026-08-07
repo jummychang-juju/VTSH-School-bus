@@ -443,8 +443,8 @@ function validTW(lat,lng){return lat>21.5&&lat<25.6&&lng>119.5&&lng<122.3;}
 /* localStorage 安全包裝(某些環境不可用) */
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-function cacheGet(code){if(code in memCache)return memCache[code];const v=lsGet("wdgeo_"+code);if(v!==null)memCache[code]=v;return v;}
-function cacheSet(code,v){memCache[code]=v;lsSet("wdgeo_"+code,v);}
+function cacheGet(code){if(code in memCache)return memCache[code];const v=lsGet("wdgeo3_"+code);if(v!==null)memCache[code]=v;return v;}
+function cacheSet(code,v){memCache[code]=v;lsSet("wdgeo3_"+code,v);}
 
 /* 路線說明:從各站地址萃取行經區域與道路 */
 const DISTRICTS=["太平","大里","霧峰","烏日","豐原","后里","潭子","大雅","神岡","清水","沙鹿","梧棲","大甲","龍井","東勢","石岡","彰化","員林","花壇","大村","南投","草屯"];
