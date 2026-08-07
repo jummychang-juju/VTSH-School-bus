@@ -139,7 +139,8 @@ footer{text-align:center;font-size:11.5px;color:var(--muted);margin-top:26px;lin
     請再跟學校多方比對確認,一切以學校最新公告及現場站牌為準。<br>
     資料更新日期:<b>2026/08/06</b><br>
     資料來源:衛道中學校車路線公告(路線 01–60,含紅字異動站)<br>
-    路線 60(南投)放學時間以學校公告為準 · 站點定位為近似值 · 地圖 © OpenStreetMap 貢獻者
+    路線 60(南投)放學時間以學校公告為準 · 站點座標以線上地址查證為準 · 地圖 © OpenStreetMap 貢獻者<br>
+    <span id="calib"></span>
   </footer>
 </div>
 
@@ -748,8 +749,10 @@ function keywordFallback(q){
   return true;
 }
 
+let searchBusy=false;
 async function runSearch(needGeocode){
   initMap();
+  searchBusy=true;
   try{
     if(needGeocode){
       const q=$("addr").value.trim();
@@ -792,8 +795,29 @@ async function runSearch(needGeocode){
     }else{
       setStatus("查詢時發生問題("+esc(e.message)+")。請確認地址含路名,或稍後再試。","err");
     }
-  }
+  }finally{searchBusy=false;}
 }
+/* 背景全站校正:開站後將全部站點逐一以真實地址查證座標(結果永久快取),
+   手工估算值僅作冷開機種子,查證完成後即不再使用 */
+async function calibrateAll(){
+  const el=$("calib");
+  let done=STOPS.filter(s=>{const g=cacheGet(s[0]);return g!==undefined&&g!==null;}).length;
+  for(const s of STOPS){
+    if(cacheGet(s[0])!==undefined)continue;
+    while(searchBusy)await new Promise(r=>setTimeout(r,700));
+    let g=null;
+    try{
+      g=await nominatim(s[4]);
+      if(g&&hav(s[7],s[8],g.lat,g.lng)>=8000)g=null;
+    }catch(e){g=null;}
+    cacheSet(s[0],g);
+    if(g)done++;
+    if(el)el.textContent="📍 站點座標線上校正中:"+done+"/"+STOPS.length;
+    await new Promise(r=>setTimeout(r,1150));
+  }
+  if(el)el.textContent="📍 站點座標已線上校正:"+done+"/"+STOPS.length;
+}
+if(!/jsdom/i.test(navigator.userAgent))setTimeout(()=>{calibrateAll().catch(()=>{});},8000);
 
 /* 路線總表 */
 $("browseRoute").addEventListener("change",()=>{
