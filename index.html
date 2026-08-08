@@ -85,6 +85,21 @@ select{border:1.5px solid var(--line);border-radius:10px;padding:9px;font-size:1
 .notice .upd{display:inline-block;background:var(--bus-yellow-soft);border-radius:6px;padding:1px 8px;font-size:11.5px;color:var(--navy);font-weight:700}
 #routeInfo{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6;background:var(--ivory);border-radius:8px;padding:7px 10px;border:1px solid var(--line)}
 #routeInfo b{color:var(--navy)}
+#backtop{display:none;position:fixed;right:14px;bottom:18px;z-index:999;background:var(--navy);color:var(--gold);border:none;border-radius:999px;padding:12px 16px;font-size:14px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+.manbtn{display:block;width:100%;margin:10px 0 0;padding:10px;background:#fff;border:1.5px solid var(--navy);color:var(--navy);border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
+#manual{display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#manual .mwrap{max-width:680px;margin:0 auto;padding:14px 14px 50px}
+#manual .mhead{position:sticky;top:0;background:var(--navy);color:#fff;padding:14px 16px;border-bottom:4px solid var(--gold);display:flex;justify-content:space-between;align-items:center;z-index:2}
+#manual .mhead b{font-size:17px}
+#manual .mclose{background:var(--gold);color:var(--navy);border:none;border-radius:10px;font-size:14px;font-weight:700;padding:7px 14px;cursor:pointer}
+#manual section{background:#fff;border:1px solid #e8e4d8;border-radius:14px;padding:14px 16px 6px;margin-top:12px}
+#manual h3{font-size:16px;color:var(--navy);margin:0 0 8px;border-left:4px solid var(--gold);padding-left:8px}
+#manual h5{font-size:14px;color:var(--navy);margin:12px 0 3px}
+#manual p,#manual li{font-size:14px;margin:5px 0;line-height:1.85}
+#manual ol,#manual ul{padding-left:20px;margin:4px 0 10px}
+#manual .mtip{background:#fff8e6;border:1px dashed var(--gold);border-radius:10px;padding:9px 11px;font-size:13px;margin:8px 0}
+#manual .mwarn{background:#fdeeee;border:1px solid #e8b8b8;border-radius:10px;padding:9px 11px;font-size:13px;margin:8px 0;color:#8a3a3a}
+#manual .kbd{display:inline-block;background:#eef1f6;border:1px solid #ccd3e0;border-radius:6px;padding:0 6px;font-size:12.5px}
 footer{font-size:12px;color:var(--muted);margin-top:26px;line-height:1.85;padding:16px 18px;background:#fff;border-radius:14px;border:1px solid #e8e4d8;text-align:left}
 footer h4{margin:14px 0 4px;font-size:12.5px;color:#1b2a4a;text-align:center}
 footer h4:first-child{margin-top:0}
@@ -107,6 +122,7 @@ footer p{margin:2px 0;padding-left:1em;text-indent:-1em}
     本站由「<b>衛了孩子</b>」與「<b>衛了孩子之爸媽愛的543</b>」管理群製作，<b>非學校官方網站，僅供參考</b>。
     內容可能尚未即時更新，請再跟學校多方比對確認。<span class="upd">適用學期：<b>115 學年度第 1 學期（115-1)</b> · 依 <b>2026.07.27</b> 公告 · 更新日期 2026/08/07</span>
   </div>
+  <button class="manbtn" onclick="document.getElementById('manual').style.display='block';try{window.scrollTo(0,0)}catch(e){}">📖 操作手冊|第一次使用請點我</button>
 
   <div class="card">
     <label>住家地址（建議含區名，例：台中市北屯區崇德路二段100號）</label>
@@ -152,6 +168,80 @@ footer p{margin:2px 0;padding-left:1em;text-indent:-1em}
   </footer>
 </div>
 
+<button id="backtop" onclick="try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){try{window.scrollTo(0,0)}catch(e2){}}">⬆ 回到查詢</button>
+
+<div id="manual">
+  <div class="mhead"><b>📖 操作手冊</b><button class="mclose" onclick="document.getElementById('manual').style.display='none'">✕ 關閉</button></div>
+  <div class="mwrap">
+  <section>
+    <h3>這個網站能幫你什麼?</h3>
+    <p>輸入住家地址,幫你<b>縮小查找校車路線的範圍</b>:列出附近的<b>參考站點</b>、路線編號、早上發車與放學到站時間,並提供 Google 步行導航連結。</p>
+    <div class="mwarn">本站<b>不提供「最近站點」的建議</b>,排序僅供參考;搭乘資訊一律以<b>學校正式公告與現場站牌</b>為準。</div>
+  </section>
+  <section>
+    <h3>🚀 快速上手(三步驟)</h3>
+    <ol>
+      <li>輸入<b>完整住家地址</b>(建議含區名,例:台中市北屯區崇德路二段100號)按<span class="kbd">搜尋</span>;或點<span class="kbd">📍 使用我目前的位置</span></li>
+      <li>等「<b>✅ 查詢完成</b>」出現——附近參考站點會列出(最終排序需幾秒)</li>
+      <li><b>逐一點各站綠色</b><span class="kbd">🚶 Google 步行導航</span>比較實際距離與時間,<b>自行選出最合適的站點</b></li>
+    </ol>
+    <div class="mtip">💡 全形/半形數字都通(76巷、７６巷皆可);「30-16號」也認得。</div>
+  </section>
+  <section>
+    <h3>🎴 看懂站點卡片</h3>
+    <ul>
+      <li>深藍徽章=<b>路線編號</b>;站名前的 <b>(06)</b>=該路線<b>第 6 站</b>(對應公告代碼,如 28 線第 6 站=2806)</li>
+      <li>站名下方灰色地標文字可點,開啟該站地圖</li>
+      <li><b style="color:#2e7d4f">✓ 位置已校準</b>:座標經政府戶政門牌或地圖人工校準</li>
+      <li><b style="color:#b26a00">⚠️ 位置未經完整驗證</b>:公告未提供完整門牌,位置僅為推估——<b>請務必以地圖與現場謹慎確認</b></li>
+      <li>🌅 早上發車/🌇 放學到站:依 2026.07.27 公告(115-1 適用)</li>
+    </ul>
+  </section>
+  <section>
+    <h3>🗺️ 地圖隱藏技巧</h3>
+    <ul>
+      <li>藍色圓點=參考站點,編號=參考順位(非最近建議)</li>
+      <li><b>點地圖任一點可把「出發位置」改成該處</b>,立刻重新排序——門牌查不到或幫別人查時特別好用</li>
+    </ul>
+    <h5>看到紅色警告「圖資中查不到這個門牌」?</h5>
+    <p>該地址不在內建門牌資料(現涵蓋台中市+彰化縣全境),系統只能粗略定位——<b>直接在地圖點一下正確位置</b>即可精準重排。</p>
+  </section>
+  <section>
+    <h3>📋 路線篩選與路線總表</h3>
+    <ul>
+      <li><b>路線篩選</b>:只看某條路線的附近站點</li>
+      <li><b>路線總表</b>:選路線瀏覽<b>全部站點與時刻</b>,適合已知道搭哪一線的家長</li>
+    </ul>
+  </section>
+  <section>
+    <h3>📱 把網站變成桌面 App(推薦!)</h3>
+    <p>加入主畫面後,桌面出現獨立圖示,點開即用、不必每次找連結。</p>
+    <h5>iPhone(Safari)</h5>
+    <ol>
+      <li>用 <b>Safari</b> 開啟本網站(若在 LINE 內開啟,請先點右下 <span class="kbd">⋯</span> → 用預設瀏覽器開啟)</li>
+      <li>點下方中間<b>分享</b> <span class="kbd">⬆️</span></li>
+      <li>往下捲,點<b>「加入主畫面」</b> → 右上<b>「新增」</b>——完成 🚌</li>
+    </ol>
+    <h5>Android(Chrome)</h5>
+    <ol>
+      <li>用 <b>Chrome</b> 開啟本網站</li>
+      <li>右上 <span class="kbd">⋮</span> → <b>「加入主畫面」</b>(或「安裝應用程式」)→ 新增——完成</li>
+    </ol>
+    <div class="mtip">💡 之後網站更新,桌面 App 打開就是最新版,免重裝。</div>
+  </section>
+  <section>
+    <h3>❓ 常見問題</h3>
+    <h5>為什麼排序不是「離我最近」?</h5>
+    <p>因未使用付費服務,無法以 Google 地圖的步行距離排序;免費引擎估算的<b>順序僅供參考</b>——請逐一點<span class="kbd">Google 步行導航</span>比較後自行判斷。完成訊息會標示「依實際步行路線排序」或「依直線初排」。</p>
+    <h5>時間會變動嗎?</h5>
+    <p>會。以學校最新公告與現場為準;<b>新生首次搭乘請提早抵達確認</b>。</p>
+    <h5>發現學校官網公告更新?</h5>
+    <p>📣 請通知「衛了孩子」或「衛了孩子之爸媽愛的543」<b>Line 群組管理員</b>,感謝共同維護!</p>
+  </section>
+  <button class="mclose" style="display:block;width:100%;margin-top:14px;padding:13px;font-size:15px" onclick="document.getElementById('manual').style.display='none';try{window.scrollTo(0,0)}catch(e){}">⬅ 看完了,回到查詢頁</button>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ============================================================
@@ -195,7 +285,7 @@ const STOPS=[
 ["0202","02","國光路口","惠順藥局(復興路3段245號)","台中市南區復興路三段245號","06:26","18:30",24.131645,120.675899],
 ["0203","02","學府路口","台中地區農會(復興路3段147號)","台中市南區復興路三段147號","06:27","18:26",24.13042,120.672893],
 ["0204","02","復興路口","五權路加油站入口","台中市南區五權路 復興路口","06:28","18:23",24.1282,120.6712],
-["0205","02","柳川東路","二手車行(五權路2之145號)","台中市西區五權路2之145號","06:30","18:18",24.136763,120.66598],
+["0205","02","柳川東路","二手車行(五權路2之191號)","台中市西區五權路2之191號","06:30","18:18",24.134405,120.666277],
 ["0206","02","五廊街口","健康宅急店(五廊街126號)","台中市西區五廊街126號","06:31","18:16",24.138038,120.66593],
 ["0207","02","自立街口","土地銀行(五權路2之4號)","台中市西區五權路2之4號","06:35","18:13",24.142457,120.668496],
 ["0208","02","中山路口","台灣人壽(五權路72號)","台中市西區五權路72號","06:37","18:09",24.146525,120.672726],
@@ -466,6 +556,7 @@ let map=null,userMarker=null,stopMarkers=[],userPos=null,userLabel="",userAddrTe
 const memCache={};
 
 const $=id=>document.getElementById(id);
+try{window.addEventListener("scroll",function(){var b=document.getElementById("backtop");if(b)b.style.display=(window.scrollY>350?"block":"none");});}catch(e){}
 function toHalf(s){return String(s).replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/　/g," ").replace(/臺/g,"台");}
 function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function setStatus(msg,type){const b=$("status");b.className=type||"info";b.innerHTML=msg;}
