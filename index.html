@@ -774,7 +774,7 @@ function render(list){
     d.innerHTML=
       "<div class='stoptop'>"+
         "<div class='routechip'>"+esc(s.route)+"<small>路線</small></div>"+
-        "<div><div class='stopname'>"+esc(s.stop)+"</div>"+
+        "<div><div class='stopname'>"+"（"+s.code.slice(2)+"）"+esc(s.stop)+"</div>"+
         "<div class='stopdesc'><a href='"+nav+"' target='_blank' rel='noopener'>"+esc(s.desc)+"</a></div>"+
         (s.gov?"<div class='verified'>✓ 位置已校準（門牌/地圖資料）</div>":(s.refined?"":"<div class='unverified'>⚠️ 位置未經完整驗證，請務必以地圖與現場<b>謹慎確認</b></div>"))+"</div>"+
       "</div>"+
@@ -846,7 +846,7 @@ function keywordFallback(q){
     const gmap=anyMapUrl(s[0],s[4],s[7],s[8]);
     const d=document.createElement("div");d.className="stop";
     d.innerHTML="<div class='stoptop'><div class='routechip'>"+esc(s[1])+"<small>路線</small></div>"+
-      "<div><div class='stopname'>"+esc(s[2])+"</div><div class='stopdesc'><a href='"+gmap+"' target='_blank' rel='noopener'>"+esc(s[3])+"</a></div></div></div>"+
+      "<div><div class='stopname'>"+"（"+s[0].slice(2)+"）"+esc(s[2])+"</div><div class='stopdesc'><a href='"+gmap+"' target='_blank' rel='noopener'>"+esc(s[3])+"</a></div></div></div>"+
       "<div class='times2'><div class='t am'>🌅 早上發車<b>"+esc(s[5])+"</b></div><div class='t pm'>🌇 放學到站<b>"+esc(s[6])+"</b></div></div>"+
       "<div class='acts'><a class='a-nav' href='"+gmap+"' target='_blank' rel='noopener'>🚶 從輸入地址導航</a></div>";
     box.appendChild(d);
